@@ -330,6 +330,14 @@ def main() -> None:
     parser.add_argument("files", nargs="*", help="Specific files/folders to process")
     args = parser.parse_args()
 
+    # On Windows, a quoted path ending in a backslash ("C:\dir\") reaches us
+    # with a stray trailing quote, because \" is parsed as an escaped quote.
+    # Quotes can't appear in Windows filenames, so drop it.
+    if os.name == "nt":
+        args.files = [f.rstrip('"') for f in args.files]
+        if args.directory:
+            args.directory = args.directory.rstrip('"')
+
     # Resolve the list of targets (files or split folders)
     targets: list[str] = args.files[:]
 

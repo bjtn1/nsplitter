@@ -128,6 +128,13 @@ class MergeTests(NsplitterTestCase):
         self.run_cli("-m", self.split_dir() + os.sep)
         self.assertTrue(os.path.exists(path))
 
+    @unittest.skipUnless(os.name == "nt", "Windows command-line quoting")
+    def test_stray_quote_from_quoted_trailing_backslash(self):
+        # cmd/PowerShell turn "C:\a b\x.split.nsp\" into ...x.split.nsp"
+        path = self.split_and_clean()
+        self.run_cli("-m", self.split_dir() + '"')
+        self.assertTrue(os.path.exists(path))
+
     def test_ignores_os_junk_files(self):
         path = self.split_and_clean()
         for junk in ("._00", ".DS_Store", "desktop.ini"):
