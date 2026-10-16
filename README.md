@@ -37,8 +37,9 @@
 - 🔹 Merge split folders back into the original file
 - 🔹 Optional dry-run mode for safe testing
 - 🔹 Supports individual files or entire directories (with optional recursion)
-- 🔹 Automatically handles file renaming and ordering
-- 🔹 Clean, color-coded CLI output with progress banners
+- 🔹 Sets the FAT archive bit so the Switch reads a split folder as one file
+- 🔹 Checks part sizes before deleting anything
+- 🔹 CLI output with progress banners and a summary
 
 ---
 
@@ -106,26 +107,29 @@ python3 nsplitter.py -s -d path/to/folder -e nsp --dry-run
 | `-e`, `--extension`| File extension to target (e.g., `nsp`, `mp4`)                |
 | `-r`, `--recursive`| Recurse into subdirectories                                   |
 | `--dry-run`        | Simulate the process without making changes                  |
+| `--clean`          | Delete the original file after a successful split            |
 | `files`            | One or more individual files/folders to process              |
 
-> Note: When using `--directory`, `--extension` is required.
+> Note: When using `--directory`, `--extension` is required. When merging, it selects split folders with that extension (e.g. `-e nsp` matches `*.split.nsp`).
 
 ---
 
 <!-- TOC --><a name="-output"></a>
 ## 📁 Output
 
-- When splitting: creates a folder named `filename.split.extension` containing numbered parts (`00`, `01`, `02`, ...).
-- When merging: combines parts back into a single file and removes the `.split` folder.
+- When splitting: creates a folder named `filename.split.extension` next to the original, containing numbered parts (`00`, `01`, `02`, ...) of at most 4 GiB - 64 KiB each, and sets the folder's archive bit. With `--clean`, the original is deleted only after the parts are checked.
+- When merging: combines parts back into a single file, checks its size, and removes the `.split` folder. It refuses to overwrite an existing file with the same name.
 
 ---
 
 <!-- TOC --><a name="-limitations"></a>
 ## 🛑 Limitations
 
-- Files ≤ 4GB will be skipped during splitting.
-- The system must have enough free disk space to create temporary parts.
-- Only numeric part names are supported (e.g., `00`, `01`, ...).
+- Files that already fit on FAT32 (≤ 4 GiB - 1 byte) are skipped during splitting.
+- The system must have enough free disk space for the parts (when splitting) or the merged file (when merging).
+- Only numeric part names are supported (e.g., `00`, `01`, ...); other files in a split folder are ignored.
+- Splitting refuses to write into an existing split folder that isn't empty.
+- The archive bit is set automatically on Windows, and on Linux when `fatattr` is installed. Elsewhere, set it yourself on the split folder, or the Switch will treat it as a plain folder.
 
 ---
 
@@ -135,11 +139,11 @@ python3 nsplitter.py -s -d path/to/folder -e nsp --dry-run
 After splitting:
 
 ```
-game.nsp
-└── game.split.nsp/
-    ├── 00
-    ├── 01
-    └── 02
+game.nsp            (deleted if --clean was used)
+game.split.nsp/
+├── 00
+├── 01
+└── 02
 ```
 
 ---

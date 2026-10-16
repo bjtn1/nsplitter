@@ -1,10 +1,6 @@
-about-time==4.2.1
 altgraph==0.17.4
-grapheme==0.6.0
 macholib==1.16.3
 packaging==24.2
 pyinstaller==6.11.1
 pyinstaller-hooks-contrib==2024.11
-python-utils==3.9.1
 setuptools==75.6.0
-typing_extensions==4.12.2
