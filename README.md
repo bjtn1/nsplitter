@@ -46,7 +46,17 @@
 <!-- TOC --><a name="-installation"></a>
 ## 📦 Installation
 
-Install it once as a command with [pipx](https://pipx.pypa.io/):
+The easiest way: download the single-file executable for your system from the [latest release](https://github.com/bjtn1/nsplitter/releases/latest). No Python needed.
+
+| System | CLI | GUI |
+|--------|-----|-----|
+| Windows | `nsplit-cli-<version>-win-amd64.exe` | `nsplit-gui-<version>-win-amd64.exe` |
+| Linux | `nsplit-cli-<version>-linux-x64` | — |
+| macOS (Apple Silicon) | `nsplit-cli-<version>-macos-arm64` | `nsplit-gui-<version>-macos-arm64` |
+
+On Linux/macOS, make it executable first (`chmod +x nsplit-cli-*`). Rename it to `nsplitter` and put it somewhere on your `PATH` to run it as `nsplitter` from anywhere.
+
+Or, if you have Python, install it as a command with [pipx](https://pipx.pypa.io/):
 
 ```bash
 pipx install git+https://github.com/bjtn1/nsplitter

@@ -1,0 +1,86 @@
+# Build single-file executables and attach them to a GitHub release.
+# Triggered by pushing a version tag, e.g.:  git tag v0.2.0 && git push origin v0.2.0
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:      # manual run: builds the binaries without releasing
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win-amd64
+            ext: .exe
+            gui: true
+          - os: ubuntu-latest
+            platform: linux-x64
+            ext: ""
+            gui: false
+          - os: macos-latest
+            platform: macos-arm64
+            ext: ""
+            gui: true
+    runs-on: ${{ matrix.os }}
+    env:
+      VERSION: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'dev' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run tests
+        run: python -m unittest discover tests
+
+      - name: Install PyInstaller
+        run: python -m pip install pyinstaller==6.11.1
+
+      - name: Build CLI
+        shell: bash
+        run: |
+          pyinstaller --onefile --name "nsplit-cli-${VERSION}-${{ matrix.platform }}" nsplitter.py
+
+      - name: Build GUI
+        if: matrix.gui
+        shell: bash
+        run: |
+          pyinstaller --onefile --windowed --name "nsplit-gui-${VERSION}-${{ matrix.platform }}" nsplitter_gui.py
+          # --windowed on macOS also makes a .app folder; ship the single binary only
+          rm -rf dist/*.app
+
+      - name: Smoke-test CLI binary
+        shell: bash
+        run: |
+          ./dist/nsplit-cli-${VERSION}-${{ matrix.platform }}${{ matrix.ext }} --help
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}
+          path: dist/*
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          chmod +x dist/nsplit-*-linux-* dist/nsplit-*-macos-* || true
+          gh release create "${{ github.ref_name }}" dist/* \
+            --repo "${{ github.repository }}" --title "${{ github.ref_name }}" --generate-notes
