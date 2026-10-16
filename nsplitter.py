@@ -293,6 +293,11 @@ def split_file(filepath: str,
 # CLI entry point
 # ----------------------------------------------------------------------
 def main() -> None:
+    # Consoles and pipes that can't encode the emoji would otherwise crash
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
+
     parser = argparse.ArgumentParser(description="Split or merge large files.")
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("-s", "--split", action="store_true", help="Split files")
@@ -300,7 +305,7 @@ def main() -> None:
 
     parser.add_argument("-d", "--directory", help="Directory to process")
     parser.add_argument("-e", "--extension", help="File extension (e.g., mp4, nsp)")
-    parser.add_argument("-r", "--recursive", action="store_true", help="Recurse into sub‑folders")
+    parser.add_argument("-r", "--recursive", action="store_true", help="Recurse into sub-folders")
     parser.add_argument("--dry-run", action="store_true", help="Simulate actions")
     parser.add_argument("--clean", action="store_true", help="Delete originals after splitting")
     parser.add_argument("files", nargs="*", help="Specific files/folders to process")
