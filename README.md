@@ -153,6 +153,8 @@ game.split.nsp/
 
 Pull requests are welcome! Please open an issue first if you’d like to discuss a major change.
 
+Run the tests with `python3 -m unittest discover tests`.
+
 ---
 
 <!-- TOC --><a name="-contact"></a>
