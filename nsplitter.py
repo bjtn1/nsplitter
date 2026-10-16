@@ -72,15 +72,16 @@ def set_archive_bit(path: str) -> bool:
 def is_split_path(path: str) -> bool:
     """
     Return ``True`` if *path* (file **or** directory name) matches the pattern
-    ``<base>.split.<ext>``.
-
-    The original implementation mistakenly stripped the last character of the
-    path (``filepath[:-1]``), which broke detection entirely.  This fixed
-    version simply looks at the basename.
+    ``<base>.split.<ext>``.  Trailing path separators are ignored.
     """
-    name = os.path.basename(path)
+    name = os.path.basename(os.path.normpath(path))
     # Anything + ".split." + non‑empty extension (no dots inside the extension)
     return bool(re.fullmatch(r".+\.split\.[^.]+", name))
+
+
+def merged_name_for(split_name: str) -> str:
+    """Return the original filename for a ``<base>.split.<ext>`` folder name."""
+    return re.sub(r"\.split(\.[^.]+)$", r"\1", split_name)
 
 
 def collect_files(directory: str,
@@ -126,27 +127,45 @@ def merge_file(folder_path: str,
     Re‑assemble a ``<name>.split.<ext>`` folder back into a single file.
     Returns the absolute path of the merged file (or an empty string on error).
     """
-    if not is_split_path(folder_path):
+    folder_path = os.path.abspath(os.path.normpath(folder_path))
+
+    if not is_split_path(folder_path) or not os.path.isdir(folder_path):
         print(f"❌ {os.path.basename(folder_path)} is not a split folder")
         return ""
 
-    # Destination filename: strip the ``.split`` part
-    merged_name = os.path.basename(folder_path).replace(".split", "")
-    merged_path = os.path.abspath(
-        os.path.join(os.path.dirname(folder_path), merged_name)
-    )
+    merged_name = merged_name_for(os.path.basename(folder_path))
+    merged_path = os.path.join(os.path.dirname(folder_path), merged_name)
 
-    # Gather the numeric part files in proper order
-    part_files = sorted(
-        (
-            os.path.abspath(os.path.join(folder_path, fn))
-            for fn in os.listdir(folder_path)
-        ),
-        key=lambda p: int(os.path.basename(p))
-    )
+    # Gather the numeric part files in proper order, ignoring OS junk such as
+    # ._00, .DS_Store, desktop.ini or Thumbs.db
+    parts: dict[int, str] = {}
+    for fn in os.listdir(folder_path):
+        fp = os.path.join(folder_path, fn)
+        if not (re.fullmatch(r"\d+", fn) and os.path.isfile(fp)):
+            continue
+        if int(fn) in parts:
+            print(f"❌ {folder_path} has two parts numbered {int(fn):02}")
+            return ""
+        parts[int(fn)] = fp
+
+    if not parts:
+        print(f"❌ {folder_path} contains no numbered parts")
+        return ""
+    missing = sorted(set(range(max(parts) + 1)) - set(parts))
+    if missing:
+        print(f"❌ {folder_path} is missing part(s) "
+              f"{', '.join(f'{n:02}' for n in missing)}")
+        return ""
+
+    part_files = [parts[n] for n in sorted(parts)]
+    total_size = sum(os.path.getsize(p) for p in part_files)
 
     if os.path.exists(merged_path):
         print(f"❌ {merged_path} already exists; refusing to overwrite it")
+        return ""
+
+    if total_size > shutil.disk_usage(os.path.dirname(folder_path)).free:
+        print(f"❌ Not enough free space to merge {folder_path}")
         return ""
 
     print_banner(f"MERGING {os.path.basename(folder_path)}")
@@ -158,11 +177,23 @@ def merge_file(folder_path: str,
         print(f"\n✅ Dry run: would merge into {merged_path}")
         return merged_path
 
-    with open(merged_path, "wb") as out_f:
-        for part in part_files:
-            print(f"ℹ️ Merging part {os.path.basename(part)}...")
-            with open(part, "rb") as in_f:
-                shutil.copyfileobj(in_f, out_f, length=buf_size)
+    out_f = open(merged_path, "xb")
+    try:
+        with out_f:
+            for part in part_files:
+                print(f"ℹ️ Merging part {os.path.basename(part)}...")
+                with open(part, "rb") as in_f:
+                    shutil.copyfileobj(in_f, out_f, length=buf_size)
+    except BaseException:
+        # Don't leave a partial file behind; it would block the next attempt
+        os.remove(merged_path)
+        raise
+
+    merged_size = os.path.getsize(merged_path)
+    if merged_size != total_size:
+        print(f"❌ {merged_path} is {merged_size} bytes but the parts total "
+              f"{total_size}; keeping {folder_path}")
+        return ""
 
     print(f"⏳ Merge took {format_elapsed_time(start)}")
     print(f"\n✅ {merged_path} successfully merged")
