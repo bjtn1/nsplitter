@@ -8,6 +8,8 @@ chunks back together.  Useful for moving data onto FAT‑32 drives or any
 media with size limits.
 """
 
+from __future__ import annotations
+
 import argparse
 import math
 import os
@@ -108,7 +110,7 @@ def collect_files(directory: str,
         else:
             for d in dirs:
                 dp = os.path.join(root, d)
-                if is_split_path(dp):
+                if is_split_path(dp) and d.lower().endswith(f".{extension.lower()}"):
                     collected.append(dp)
 
         if not recursive:
@@ -309,7 +311,7 @@ def main() -> None:
 
     if args.directory:
         if not args.extension:
-            exit("❌ -e/--extension is required when using -d/--directory.")
+            sys.exit("❌ -e/--extension is required when using -d/--directory.")
         ext = args.extension.lstrip(".")
         to_split = bool(args.split)
         targets.extend(
@@ -321,9 +323,8 @@ def main() -> None:
         return
 
     start_all = time.time()
-    split_cnt = merge_cnt = 0
-    split_paths: list[str] = []
-    merge_paths: list[str] = []
+    done_paths: list[str] = []
+    failed = 0
 
     for path in targets:
         # --------------------------------------------------------------
@@ -331,39 +332,47 @@ def main() -> None:
         # --------------------------------------------------------------
         if args.split:
             if not os.path.isfile(path):
+                print(f"⏭️ Skipping {path}: not a file.")
                 continue
             if os.path.getsize(path) <= FAT32_MAX_FILE_SIZE:
+                print(f"⏭️ Skipping {path}: already fits on FAT32.")
                 continue
-            if os.path.getsize(path) > shutil.disk_usage(path).free:
+            parent = os.path.dirname(os.path.abspath(path))
+            if os.path.getsize(path) > shutil.disk_usage(parent).free:
                 print(f"⏭️ Skipping {path}: insufficient free space.")
                 continue
 
-            split_paths.append(split_file(path,
-                                         dry_run=args.dry_run,
-                                         clean=args.clean))
-            split_cnt += 1
+            result = split_file(path, dry_run=args.dry_run, clean=args.clean)
 
         # --------------------------------------------------------------
         # Merge workflow
         # --------------------------------------------------------------
         else:   # args.merge
             if not is_split_path(path):
+                print(f"⏭️ Skipping {path}: not a .split.<ext> folder.")
                 continue
-            merge_paths.append(merge_file(path, dry_run=args.dry_run))
-            merge_cnt += 1
+            result = merge_file(path, dry_run=args.dry_run)
+
+        if result:
+            done_paths.append(result)
+        else:
+            failed += 1
 
     total_elapsed = format_elapsed_time(start_all)
 
-    if args.split:
-        print_banner("SUMMARY")
-        for p in sorted(split_paths):
-            print(f"✅ {p}")
-        print(f"\nSplit {split_cnt} file(s) in {total_elapsed}")
+    if args.dry_run:
+        verb = "Would split" if args.split else "Would merge"
     else:
-        print_banner("SUMMARY")
-        for p in sorted(merge_paths):
-            print(f"✅ {p}")
-        print(f"\nMerged {merge_cnt} folder(s) in {total_elapsed}")
+        verb = "Split" if args.split else "Merged"
+    noun = "file(s)" if args.split else "folder(s)"
+
+    print_banner("SUMMARY")
+    for p in sorted(done_paths):
+        print(f"✅ {p}")
+    print(f"\n{verb} {len(done_paths)} {noun} in {total_elapsed}")
+    if failed:
+        print(f"❌ {failed} {noun} failed; see the messages above")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
