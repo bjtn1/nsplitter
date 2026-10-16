@@ -150,6 +150,19 @@ class MergeTests(NsplitterTestCase):
         self.run_cli("-m", self.split_dir("a.splitter.split.nsp"))
         self.assertEqual(os.listdir(self.dir), ["a.splitter.nsp"])
 
+    def test_file_without_extension_round_trips(self):
+        path = self.make_file("backup")
+        self.run_cli("-s", "--clean", path)
+        self.assertEqual(os.listdir(self.dir), ["backup.split"])
+        self.run_cli("-m", self.split_dir("backup.split"))
+        with open(path, "rb") as f:
+            self.assertEqual(f.read(), self.data)
+
+    def test_missing_directory_is_an_error(self):
+        code, out = self.run_cli("-s", "-d", os.path.join(self.dir, "nope"), "-e", "nsp")
+        self.assertIn("is not a directory", str(code) + out)
+        self.assertNotEqual(code, 0)
+
     def test_directory_merge_honours_extension(self):
         self.split_and_clean("game.nsp")
         self.split_and_clean("movie.mp4")

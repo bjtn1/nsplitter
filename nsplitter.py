@@ -74,16 +74,16 @@ def set_archive_bit(path: str) -> bool:
 def is_split_path(path: str) -> bool:
     """
     Return ``True`` if *path* (file **or** directory name) matches the pattern
-    ``<base>.split.<ext>``.  Trailing path separators are ignored.
+    ``<base>.split.<ext>``, or ``<base>.split`` for files without an
+    extension.  Trailing path separators are ignored.
     """
     name = os.path.basename(os.path.normpath(path))
-    # Anything + ".split." + non‑empty extension (no dots inside the extension)
-    return bool(re.fullmatch(r".+\.split\.[^.]+", name))
+    return bool(re.fullmatch(r".+\.split(\.[^.]+)?", name))
 
 
 def merged_name_for(split_name: str) -> str:
-    """Return the original filename for a ``<base>.split.<ext>`` folder name."""
-    return re.sub(r"\.split(\.[^.]+)$", r"\1", split_name)
+    """Return the original filename for a ``<base>.split[.<ext>]`` folder name."""
+    return re.sub(r"\.split(\.[^.]+)?$", r"\1", split_name)
 
 
 def collect_files(directory: str,
@@ -243,7 +243,7 @@ def split_file(filepath: str,
     ext = os.path.splitext(filepath)[1].lstrip(".")
     base = os.path.splitext(filename)[0]
     split_dir = os.path.abspath(
-        os.path.join(parent_dir, f"{base}.split.{ext}")
+        os.path.join(parent_dir, f"{base}.split.{ext}" if ext else f"{base}.split")
     )
 
     # Leftover parts from an earlier split would be merged in later
@@ -336,6 +336,8 @@ def main() -> None:
     if args.directory:
         if not args.extension:
             sys.exit("❌ -e/--extension is required when using -d/--directory.")
+        if not os.path.isdir(args.directory):
+            sys.exit(f"❌ {args.directory} is not a directory.")
         ext = args.extension.lstrip(".")
         to_split = bool(args.split)
         targets.extend(
