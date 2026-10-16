@@ -12,6 +12,8 @@ import argparse
 import math
 import os
 import shutil
+import subprocess
+import sys
 import time
 import re
 
@@ -40,6 +42,31 @@ def format_elapsed_time(start_time: float) -> str:
     hrs, rem = divmod(int(elapsed), 3600)
     mins, secs = divmod(rem, 60)
     return f"{hrs:02}:{mins:02}:{secs:02}"
+
+
+def set_archive_bit(path: str) -> bool:
+    """
+    Set the FAT archive attribute on *path*.  The Switch only treats a folder
+    of numbered parts as a single file when this attribute is set.
+    Returns ``True`` on success.
+    """
+    if os.name == "nt":
+        import ctypes
+        FILE_ATTRIBUTE_ARCHIVE = 0x20
+        INVALID_FILE_ATTRIBUTES = 0xFFFFFFFF
+        kernel32 = ctypes.windll.kernel32
+        kernel32.GetFileAttributesW.restype = ctypes.c_uint32
+        attrs = kernel32.GetFileAttributesW(path)
+        if attrs == INVALID_FILE_ATTRIBUTES:
+            return False
+        return bool(kernel32.SetFileAttributesW(path, attrs | FILE_ATTRIBUTE_ARCHIVE))
+
+    # Linux: fatattr (from the fatattr package) works on mounted FAT drives
+    if shutil.which("fatattr"):
+        result = subprocess.run(["fatattr", "+a", path], capture_output=True)
+        return result.returncode == 0
+
+    return False
 
 
 def is_split_path(path: str) -> bool:
@@ -197,6 +224,10 @@ def split_file(filepath: str,
                         dst.write(chunk)
                         written += len(chunk)
             print()   # newline after each part’s progress line
+
+    if not dry_run and not set_archive_bit(split_dir):
+        print(f"⚠️ Could not set the archive bit on {split_dir}. "
+              "Set it manually or the Switch will not see the parts as one file.")
 
     if clean and not dry_run:
         os.remove(filepath)
