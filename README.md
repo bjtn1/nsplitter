@@ -54,6 +54,14 @@ python3 nsplitter.py --help
 
 > Requires Python 3.7+
 
+### GUI
+
+```bash
+python3 nsplitter_gui.py
+```
+
+Pick **Split** or **Merge**, add files (or split folders) with **Add…**, or fill the list by scanning a folder for an extension, optionally recursively. Dry-run and Clean work as on the command line, and the log shows each result. The GUI needs Tkinter, which ships with Python on Windows and macOS; on Debian/Ubuntu install `python3-tk`.
+
 ---
 
 <!-- TOC --><a name="-usage"></a>

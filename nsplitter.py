@@ -119,6 +119,25 @@ def collect_files(directory: str,
     return collected
 
 
+def split_skip_reason(path: str) -> str:
+    """Return why *path* should not be split, or an empty string if it should."""
+    if not os.path.isfile(path):
+        return "not a file"
+    if os.path.getsize(path) <= FAT32_MAX_FILE_SIZE:
+        return "already fits on FAT32"
+    parent = os.path.dirname(os.path.abspath(path))
+    if os.path.getsize(path) > shutil.disk_usage(parent).free:
+        return "insufficient free space"
+    return ""
+
+
+def merge_skip_reason(path: str) -> str:
+    """Return why *path* should not be merged, or an empty string if it should."""
+    if not is_split_path(path):
+        return "not a .split.<ext> folder"
+    return ""
+
+
 # ----------------------------------------------------------------------
 # Core operations
 # ----------------------------------------------------------------------
@@ -336,15 +355,9 @@ def main() -> None:
         # Split workflow
         # --------------------------------------------------------------
         if args.split:
-            if not os.path.isfile(path):
-                print(f"⏭️ Skipping {path}: not a file.")
-                continue
-            if os.path.getsize(path) <= FAT32_MAX_FILE_SIZE:
-                print(f"⏭️ Skipping {path}: already fits on FAT32.")
-                continue
-            parent = os.path.dirname(os.path.abspath(path))
-            if os.path.getsize(path) > shutil.disk_usage(parent).free:
-                print(f"⏭️ Skipping {path}: insufficient free space.")
+            reason = split_skip_reason(path)
+            if reason:
+                print(f"⏭️ Skipping {path}: {reason}.")
                 continue
 
             result = split_file(path, dry_run=args.dry_run, clean=args.clean)
@@ -353,8 +366,9 @@ def main() -> None:
         # Merge workflow
         # --------------------------------------------------------------
         else:   # args.merge
-            if not is_split_path(path):
-                print(f"⏭️ Skipping {path}: not a .split.<ext> folder.")
+            reason = merge_skip_reason(path)
+            if reason:
+                print(f"⏭️ Skipping {path}: {reason}.")
                 continue
             result = merge_file(path, dry_run=args.dry_run)
 
