@@ -21,8 +21,8 @@ import re
 # Constants
 # ----------------------------------------------------------------------
 THIRTY_TWO_KB = 0x8000               # 32 768 bytes
-FOUR_GB       = 0xFFFF0000           # 4 294 901 760 bytes
-MAX_SPLIT_SIZE = FOUR_GB              # Upper limit per chunk
+FAT32_MAX_FILE_SIZE = 0xFFFFFFFF     # Largest file FAT32 can store (4 GiB - 1)
+MAX_SPLIT_SIZE = 0xFFFF0000          # Chunk size: 4 GiB - 64 KiB, as splitNSP uses
 FOUR_MB       = 4 * 1024 * 1024      # Buffer size for merging
 
 
@@ -208,13 +208,14 @@ def split_file(filepath: str,
                dry_run: bool = False,
                clean: bool = False) -> str:
     """
-    Split *filepath* into 4 GB chunks placed in a sibling folder
-    ``<basename>.split.<ext>``.  Returns the absolute path of that folder.
+    Split *filepath* into chunks of at most ``MAX_SPLIT_SIZE`` bytes placed in
+    a sibling folder ``<basename>.split.<ext>``.  Returns the absolute path of
+    that folder (or an empty string on error).
     """
     filesize = os.path.getsize(filepath)
     filename = os.path.basename(filepath)
 
-    # Number of 4 GB chunks needed (ceil for partial final chunk)
+    # Number of chunks needed (ceil for partial final chunk)
     num_splits = math.ceil(filesize / MAX_SPLIT_SIZE)
 
     parent_dir = os.path.dirname(filepath)
@@ -224,10 +225,20 @@ def split_file(filepath: str,
         os.path.join(parent_dir, f"{base}.split.{ext}")
     )
 
-    if not dry_run:
-        os.makedirs(split_dir, exist_ok=True)
+    # Leftover parts from an earlier split would be merged in later
+    if os.path.isdir(split_dir) and os.listdir(split_dir):
+        print(f"❌ {split_dir} already exists and is not empty; "
+              "remove it or merge it first")
+        return ""
 
     print_banner(f"SPLITTING {filename}")
+
+    if dry_run:
+        print(f"ℹ️ Would split into {num_splits} part(s)")
+        print(f"✅ Dry run: would create {split_dir}")
+        return split_dir
+
+    os.makedirs(split_dir, exist_ok=True)
 
     with open(filepath, "rb") as src:
         for idx in range(num_splits):
@@ -236,31 +247,40 @@ def split_file(filepath: str,
             start = time.time()
             last_sec = -1
 
-            if not dry_run:
-                with open(part_path, "wb") as dst:
-                    written = 0
-                    while written < MAX_SPLIT_SIZE:
-                        now_sec = int(time.time() - start)
-                        if now_sec != last_sec:
-                            print(
-                                f"ℹ️ Splitting part {idx:02}... "
-                                f"Elapsed: {format_elapsed_time(start)}",
-                                end="\r"
-                            )
-                            last_sec = now_sec
+            with open(part_path, "wb") as dst:
+                written = 0
+                while written < MAX_SPLIT_SIZE:
+                    now_sec = int(time.time() - start)
+                    if now_sec != last_sec:
+                        print(
+                            f"ℹ️ Splitting part {idx:02}... "
+                            f"Elapsed: {format_elapsed_time(start)}",
+                            end="\r"
+                        )
+                        last_sec = now_sec
 
-                        chunk = src.read(buf_size)
-                        if not chunk:
-                            break
-                        dst.write(chunk)
-                        written += len(chunk)
+                    # Never read past the chunk limit, whatever buf_size is
+                    chunk = src.read(min(buf_size, MAX_SPLIT_SIZE - written))
+                    if not chunk:
+                        break
+                    dst.write(chunk)
+                    written += len(chunk)
             print()   # newline after each part’s progress line
 
-    if not dry_run and not set_archive_bit(split_dir):
+    split_size = sum(
+        os.path.getsize(os.path.join(split_dir, f"{i:02}"))
+        for i in range(num_splits)
+    )
+    if split_size != filesize:
+        print(f"❌ Parts total {split_size} bytes but {filename} is "
+              f"{filesize}; keeping the original")
+        return ""
+
+    if not set_archive_bit(split_dir):
         print(f"⚠️ Could not set the archive bit on {split_dir}. "
               "Set it manually or the Switch will not see the parts as one file.")
 
-    if clean and not dry_run:
+    if clean:
         os.remove(filepath)
 
     print(f"✅ {split_dir} successfully split")
@@ -312,7 +332,7 @@ def main() -> None:
         if args.split:
             if not os.path.isfile(path):
                 continue
-            if os.path.getsize(path) <= FOUR_GB:
+            if os.path.getsize(path) <= FAT32_MAX_FILE_SIZE:
                 continue
             if os.path.getsize(path) > shutil.disk_usage(path).free:
                 print(f"⏭️ Skipping {path}: insufficient free space.")
