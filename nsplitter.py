@@ -118,23 +118,29 @@ def merge_file(folder_path: str,
         key=lambda p: int(os.path.basename(p))
     )
 
+    if os.path.exists(merged_path):
+        print(f"❌ {merged_path} already exists; refusing to overwrite it")
+        return ""
+
     print_banner(f"MERGING {os.path.basename(folder_path)}")
     start = time.time()
+
+    if dry_run:
+        for part in part_files:
+            print(f"ℹ️ Would merge part {os.path.basename(part)}")
+        print(f"\n✅ Dry run: would merge into {merged_path}")
+        return merged_path
 
     with open(merged_path, "wb") as out_f:
         for part in part_files:
             print(f"ℹ️ Merging part {os.path.basename(part)}...")
-            if not dry_run:                     # *** ONLY copy when not a dry‑run ***
-                with open(part, "rb") as in_f:
-                    shutil.copyfileobj(in_f, out_f, length=buf_size)
+            with open(part, "rb") as in_f:
+                shutil.copyfileobj(in_f, out_f, length=buf_size)
 
     print(f"⏳ Merge took {format_elapsed_time(start)}")
     print(f"\n✅ {merged_path} successfully merged")
 
-    # ----- DO NOT DELETE ON DRY‑RUN ------------------------------------
-    if not dry_run:                           # *** GUARD THE DELETION ***
-        shutil.rmtree(folder_path)            # remove only after a real merge
-    # --------------------------------------------------------------------
+    shutil.rmtree(folder_path)
 
     return merged_path
 
@@ -192,7 +198,7 @@ def split_file(filepath: str,
                         written += len(chunk)
             print()   # newline after each part’s progress line
 
-    if clean:
+    if clean and not dry_run:
         os.remove(filepath)
 
     print(f"✅ {split_dir} successfully split")
