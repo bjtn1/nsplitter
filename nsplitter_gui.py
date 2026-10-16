@@ -400,6 +400,9 @@ class SplitMergeGUI(tk.Tk):
         self.destroy()
 
 
+def main() -> None:
+    SplitMergeGUI().mainloop()
+
+
 if __name__ == "__main__":
-    app = SplitMergeGUI()
-    app.mainloop()
+    main()

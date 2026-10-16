@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nsplitter"
+version = "0.2.0"
+description = "Split files larger than 4GB so they can be transferred to a FAT32 drive"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "Brandon Jose Tenorio Noguera", email = "nsplitter@bjtn.me" }]
+requires-python = ">=3.7"
+
+[project.urls]
+Homepage = "https://github.com/bjtn1/nsplitter"
+
+[project.scripts]
+nsplitter = "nsplitter:main"
+
+[project.gui-scripts]
+nsplitter-gui = "nsplitter_gui:main"
+
+[tool.setuptools]
+py-modules = ["nsplitter", "nsplitter_gui"]

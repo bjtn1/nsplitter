@@ -46,19 +46,29 @@
 <!-- TOC --><a name="-installation"></a>
 ## 📦 Installation
 
+Install it once as a command with [pipx](https://pipx.pypa.io/):
+
 ```bash
-git clone https://github.com/bjtn1/nsplitter.git
-cd nsplitter
-python3 nsplitter.py --help
+pipx install git+https://github.com/bjtn1/nsplitter
 ```
+
+Then run `nsplitter` from anywhere (`pipx upgrade nsplitter` updates it). Or run it without installing, using [uv](https://docs.astral.sh/uv/):
+
+```bash
+uvx --from git+https://github.com/bjtn1/nsplitter nsplitter -s path/to/largefile.nsp
+```
+
+From a clone, `python3 nsplitter.py` works the same as `nsplitter`.
 
 > Requires Python 3.7+
 
 ### GUI
 
 ```bash
-python3 nsplitter_gui.py
+nsplitter-gui
 ```
+
+(or `python3 nsplitter_gui.py` from a clone)
 
 Pick **Split** or **Merge**, add files (or split folders) with **Add…**, or fill the list by scanning a folder for an extension, optionally recursively. Dry-run and Clean work as on the command line, and the log shows each result. The GUI needs Tkinter, which ships with Python on Windows and macOS; on Debian/Ubuntu install `python3-tk`.
 
@@ -71,35 +81,35 @@ Pick **Split** or **Merge**, add files (or split folders) with **Add…**, or fi
 ### Split a single file
 
 ```bash
-python3 nsplitter.py -s path/to/largefile.nsp
+nsplitter -s path/to/largefile.nsp
 ```
 
 <!-- TOC --><a name="merge-a-previously-split-folder"></a>
 ### Merge a previously split folder
 
 ```bash
-python3 nsplitter.py -m path/to/largefile.split.nsp
+nsplitter -m path/to/largefile.split.nsp
 ```
 
 <!-- TOC --><a name="split-all-nsp-files-in-a-folder-non-recursive"></a>
 ### Split all `.nsp` files in a folder (non-recursive)
 
 ```bash
-python3 nsplitter.py -s -d path/to/folder -e nsp
+nsplitter -s -d path/to/folder -e nsp
 ```
 
 <!-- TOC --><a name="merge-all-split-folders-in-a-folder-recursively"></a>
 ### Merge all split folders in a folder recursively
 
 ```bash
-python3 nsplitter.py -m -d path/to/folder -e nsp -r
+nsplitter -m -d path/to/folder -e nsp -r
 ```
 
 <!-- TOC --><a name="dry-run-mode-simulate-actions-without-modifying-files"></a>
 ### Dry-run mode (simulate actions without modifying files)
 
 ```bash
-python3 nsplitter.py -s -d path/to/folder -e nsp --dry-run
+nsplitter -s -d path/to/folder -e nsp --dry-run
 ```
 
 ---
